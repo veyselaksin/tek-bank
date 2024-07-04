@@ -1,0 +1,9 @@
+{
+  "healthy": "Uygulama sağlıklı.",
+  "unexpected_error": "Bilinmeyen bir hata oluştu.",
+  "user_already_exists": "Kullanıcı zaten mevcut.",
+  "user_not_found": "Kullanıcı bulunamadı.",
+  "passwords_do_not_match": "Şifreler eşleşmiyor.",
+  "password_incorrect": "Şifre yanlış.",
+  "invalid_login_credentials": "Kullanıcı adı veya şifre hatalı."
+}

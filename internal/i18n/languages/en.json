@@ -1,0 +1,9 @@
+{
+  "healthy": "Healthy",
+  "unexpected_error": "An unexpected error occurred.",
+  "user_already_exists": "User already exists.",
+  "user_not_found": "User not found.",
+  "passwords_do_not_match": "Passwords do not match.",
+  "password_incorrect": "Password is incorrect.",
+    "invalid_login_credentials": "Invalid login credentials."
+}
