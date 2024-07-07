@@ -23,6 +23,7 @@ type AccountRepository interface {
 	WithTx(trxHandle *gorm.DB) AccountRepository
 }
 
+//go:generate mockgen -destination=../../mocks/repository/account_repository_mock.go -package=repository tek-bank/internal/db/repository AccountRepository
 type accountRepository struct {
 	db          *gorm.DB
 	redisClient *redis.Client

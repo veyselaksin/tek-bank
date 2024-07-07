@@ -12,6 +12,8 @@ import (
 	"tek-bank/cmd/api/middleware/transaction"
 	"tek-bank/internal/db/repository"
 	"tek-bank/internal/service"
+	"tek-bank/pkg/converter"
+	"tek-bank/pkg/crypto"
 )
 
 // HealthCheck godoc
@@ -39,14 +41,18 @@ func InitializeRouters(app *fiber.App, connection *gorm.DB, redis *redis.Client)
 
 	authentication := authware.New(authorizationConfig)
 
+	// Packages
+	pkgConverter := converter.NewConverter()
+	pkgCrypto := crypto.NewCrypto()
+
 	// Repositories
 	userRepository := repository.NewUserRepository(connection)
 	accountRepository := repository.NewAccountRepository(connection, redis)
 	transferHistoryRepository := repository.NewTransferHistoryRepository(connection)
 
 	// Services
-	authService := service.NewAuthService(userRepository)
-	accountService := service.NewAccountService(accountRepository, userRepository, transferHistoryRepository)
+	authService := service.NewAuthService(userRepository, pkgCrypto)
+	accountService := service.NewAccountService(accountRepository, userRepository, transferHistoryRepository, pkgCrypto, pkgConverter)
 	profileService := service.NewProfileService(accountRepository, transferHistoryRepository, userRepository)
 
 	// Handlers

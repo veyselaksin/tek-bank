@@ -1,11 +1,11 @@
 package authware
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
 	"tek-bank/internal/db/repository"
-	"tek-bank/pkg/converter"
 	"tek-bank/pkg/cresponse"
 
 	"github.com/gofiber/fiber/v2"
@@ -62,11 +62,16 @@ func setup(config Config) Config {
 		}
 
 		var claimsStruct JWTClaimsPayload
-
-		err = converter.CopyStruct(claims, &claimsStruct)
-		if err != nil && err.Error() != "src and dest must be a struct" {
-			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, err.Error())
+		jsonItem, err := json.Marshal(claims)
+		if err != nil {
+			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, "Token is not valid")
 		}
+
+		err = json.Unmarshal(jsonItem, &claimsStruct)
+		if err != nil {
+			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, "Token is not valid")
+		}
+
 		if err != nil {
 			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, "Token is not valid")
 		}
@@ -129,10 +134,16 @@ func checkPermission(ctx *fiber.Ctx, db *gorm.DB, claim JWTClaimsPayload) bool {
 	} else {
 
 		var currentUser CurrentUser
-		err := converter.CopyStruct(user, &currentUser)
+		jsonItem, err := json.Marshal(user)
 		if err != nil {
 			return false
 		}
+
+		err = json.Unmarshal(jsonItem, &currentUser)
+		if err != nil {
+			return false
+		}
+
 		ctx.Locals(currentUserLabel, currentUser)
 
 		return true

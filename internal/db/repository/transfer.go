@@ -5,6 +5,7 @@ import (
 	"tek-bank/internal/db/models"
 )
 
+//go:generate mockgen -destination=../../mocks/repository/transfer_history_repository_mock.go -package=repository tek-bank/internal/db/repository TransferHistoryRepository
 type TransferHistoryRepository interface {
 	Create(transferHistory []models.TransferHistory) error
 	FetchByAccountNumber(accountNumber int64) ([]models.TransferHistory, error)

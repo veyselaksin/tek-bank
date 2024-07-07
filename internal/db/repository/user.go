@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -destination=../../mocks/repository/user_repository_mock.go -package=repository tek-bank/internal/db/repository UserRepository
 type UserRepository interface {
 	FindAll() ([]models.User, error)
 	FindByID(id string) (*models.User, error)
@@ -78,7 +79,7 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 func (r *userRepository) FindByUniqueIdentifier(uniqueIdentifier string) (*models.User, error) {
 	// Find by identity number or customer number
 	var user models.User
-	result := r.db.Table(r.tableName).Where("identity_number = ? OR customer_number = ?", uniqueIdentifier, uniqueIdentifier).First(&user)
+	result := r.db.Table(r.tableName).Where("\"identity_number\" = ? OR \"customer_number\" = ?", uniqueIdentifier, uniqueIdentifier).First(&user)
 	if result.Error != nil {
 		return nil, result.Error
 	}

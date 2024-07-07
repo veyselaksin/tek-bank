@@ -22,11 +22,16 @@ type AuthService interface {
 
 type authService struct {
 	userRepository repository.UserRepository
+	pkgCrypto      crypto.Crypto
 }
 
-func NewAuthService(userRepository repository.UserRepository) AuthService {
+func NewAuthService(
+	userRepository repository.UserRepository,
+	pkgCrypto crypto.Crypto,
+) AuthService {
 	return &authService{
 		userRepository: userRepository,
+		pkgCrypto:      pkgCrypto,
 	}
 }
 
@@ -42,7 +47,7 @@ func (s *authService) Login(ctx *fiber.Ctx, request dto.LoginRequest) (*dto.Logi
 	}
 
 	// Check the password
-	if !crypto.CheckPasswordHash(request.Password, user.Password) {
+	if !s.pkgCrypto.CheckPasswordHash(request.Password, user.Password) {
 		log.Error("Password is incorrect.")
 		return nil, fiber.StatusUnauthorized, errors.New(i18n.CreateMsg(ctx, messages.PasswordIncorrect))
 	}

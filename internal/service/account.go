@@ -32,17 +32,23 @@ type accountService struct {
 	accountRepository         repository.AccountRepository
 	userRepository            repository.UserRepository
 	transferHistoryRepository repository.TransferHistoryRepository
+	pkgCrypto                 crypto.Crypto
+	pkgConverter              converter.Converter
 }
 
 func NewAccountService(
 	accountRepository repository.AccountRepository,
 	userRepository repository.UserRepository,
 	transferHistoryRepository repository.TransferHistoryRepository,
+	pkgCrypto crypto.Crypto,
+	pkgConverter converter.Converter,
 ) AccountService {
 	return &accountService{
 		accountRepository:         accountRepository,
 		userRepository:            userRepository,
 		transferHistoryRepository: transferHistoryRepository,
+		pkgCrypto:                 pkgCrypto,
+		pkgConverter:              pkgConverter,
 	}
 }
 
@@ -67,10 +73,10 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
 	}
 
-	randomPassword := crypto.RandomPassword()
+	randomPassword := s.pkgCrypto.RandomPassword()
 
 	// Hash the password
-	hashedPassword, err := crypto.HashPassword(randomPassword)
+	hashedPassword, err := s.pkgCrypto.HashPassword(randomPassword)
 	if err != nil {
 		log.Error("Error hashing the password: ", err)
 		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
@@ -79,7 +85,7 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 	// Register a new authware
 	user := models.User{
 		IdentityNumber: request.IdentityNumber,
-		CustomerNumber: crypto.RandomNumber(),
+		CustomerNumber: s.pkgCrypto.RandomNumber(),
 		FirstName:      request.FirstName,
 		LastName:       request.LastName,
 		Email:          request.Email,
@@ -95,9 +101,9 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 
 	// Create a new account for the user
 	account := models.Account{
-		IBAN:          crypto.RandomIBAN(request.ISOCountryCode),
+		IBAN:          s.pkgCrypto.RandomIBAN(request.ISOCountryCode),
 		OwnerId:       createdUser.Id,
-		AccountNumber: crypto.RandomNumber(),
+		AccountNumber: s.pkgCrypto.RandomNumber(),
 		Balance:       0,
 		CreatedBy:     createdUser.Id,
 		UpdatedBy:     createdUser.Id,
@@ -129,16 +135,26 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 // CreateNewAccount creates a new account for the registered user
 func (s *accountService) CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewAccountRequest) (*dto.CreateNewAccountResponse, int, error) {
 	// Check if the user exists
+	_, err := s.userRepository.FindByID(request.UserId)
+	if err != nil && err.Error() == "record not found" {
+		log.Error("Error finding the user: ", err)
+		return nil, fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.UserNotFound))
+	}
+
+	if err != nil {
+		log.Error("Error finding a authware: ", err)
+		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+	}
 
 	// Create a random IBAN for the user
-	iban := crypto.RandomIBAN(request.ISOCountryCode)
+	iban := s.pkgCrypto.RandomIBAN(request.ISOCountryCode)
 
 	// Create a new account for the user
 	account := models.Account{
 		IBAN:          iban,
 		OwnerId:       request.UserId,
 		Balance:       0,
-		AccountNumber: crypto.RandomNumber(),
+		AccountNumber: s.pkgCrypto.RandomNumber(),
 		CreatedBy:     request.UserId,
 		UpdatedBy:     request.UserId,
 	}
@@ -149,12 +165,10 @@ func (s *accountService) CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewA
 		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
 	}
 
-	fmt.Println(createdAccount)
-
 	response := &dto.CreateNewAccountResponse{
 		UserId:        createdAccount.OwnerId,
 		IBAN:          createdAccount.IBAN,
-		AccountNumber: crypto.RandomNumber(),
+		AccountNumber: s.pkgCrypto.RandomNumber(),
 		FirstName:     createdAccount.Owner.FirstName,
 		LastName:      createdAccount.Owner.LastName,
 		Balance:       createdAccount.Balance,
@@ -208,7 +222,7 @@ func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoney
 	}
 
 	// Create a token for the transaction approval
-	token, err := crypto.GenerateToken(32)
+	token, err := s.pkgCrypto.GenerateToken(32)
 	if err != nil {
 		log.Error(err)
 		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
@@ -231,7 +245,7 @@ func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoney
 		Token:             token,
 	}
 
-	content, err := converter.Stos(value)
+	content, err := s.pkgConverter.Stos(value)
 	if err != nil {
 		log.Error(err)
 		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
@@ -294,7 +308,7 @@ func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, er
 		Token             string
 	}
 
-	err = converter.Stom(*value, &content)
+	err = s.pkgConverter.Stom(*value, &content)
 	if err != nil {
 		log.Error(err)
 		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
