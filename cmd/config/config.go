@@ -41,7 +41,3 @@ func GetLanguage(c *fiber.Ctx) string {
 	}
 	return lang
 }
-
-func I18NPath(lang string) string {
-	return "./i18n/languages/"
-}

@@ -1,32 +1,45 @@
 package converter
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 )
 
 func CopyStruct(src any, dest any) error {
-	srcType := reflect.TypeOf(src)
-	srcValue := reflect.ValueOf(src)
-	destType := reflect.TypeOf(dest)
-	destValue := reflect.ValueOf(dest)
-
-	if srcType.Kind() != reflect.Struct || destType.Kind() != reflect.Struct {
-		return errors.New("src and dest must be a struct")
+	jsonItem, err := json.Marshal(src)
+	if err != nil {
+		return err
 	}
 
-	for i := 0; i < srcType.NumField(); i++ {
-		srcField := srcType.Field(i)
-		srcFieldValue := srcValue.Field(i)
+	err = json.Unmarshal(jsonItem, dest)
+	if err != nil {
+		return err
+	}
 
-		for j := 0; j < destType.NumField(); j++ {
-			destField := destType.Field(j)
-			destFieldValue := destValue.Field(j)
+	return nil
+}
 
-			if srcField.Name == destField.Name && srcField.Type == destField.Type {
-				destFieldValue.Set(srcFieldValue)
-			}
-		}
+// Stos is a function that converts any struct to a string
+func Stos(item any) (*string, error) {
+	// Check if the item is a struct
+	if reflect.TypeOf(item).Kind() != reflect.Struct {
+		return nil, errors.New("Item is not a struct")
+	}
+	jsonItem, err := json.Marshal(item)
+	if err != nil {
+		return nil, err
+	}
+
+	itemString := string(jsonItem)
+	return &itemString, nil
+}
+
+// Stom is a function that converts a string to a struct
+func Stom(item string, dest any) error {
+	err := json.Unmarshal([]byte(item), dest)
+	if err != nil {
+		return err
 	}
 
 	return nil

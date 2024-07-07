@@ -2,18 +2,17 @@ package authware
 
 import (
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"strings"
 	"time"
 )
 
 type JWTClaimsPayload struct {
-	ID        string `json:"id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
+	ID          string `json:"id"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	PhoneNumber string `json:"phone_number"`
+	Email       string `json:"email"`
 	jwt.RegisteredClaims
 }
 
@@ -22,11 +21,11 @@ func GenerateJwtToken(payload JWTClaimsPayload, SecretKey string) (string, error
 	now := time.Now().UTC()
 
 	claims := JWTClaimsPayload{
-		ID:        payload.ID,
-		FirstName: payload.FirstName,
-		LastName:  payload.LastName,
-		Username:  payload.Username,
-		Email:     payload.Email,
+		ID:          payload.ID,
+		FirstName:   payload.FirstName,
+		LastName:    payload.LastName,
+		PhoneNumber: payload.PhoneNumber,
+		Email:       payload.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: &jwt.NumericDate{
 				Time: now.Add(time.Hour * 24).UTC(),
@@ -64,7 +63,7 @@ func IsTokenValid(token string, secretKey string) (bool, jwt.MapClaims, error) {
 	}
 }
 
-func ExtractToken(c *fiber.Ctx, authorizationHeaderKey, authorizationTypeBearer string) (string, error) {
+func ExtractToken(authorizationHeaderKey, authorizationTypeBearer string) (string, error) {
 
 	if len(authorizationHeaderKey) == 0 {
 		return "", fmt.Errorf("Authorization header is missing")

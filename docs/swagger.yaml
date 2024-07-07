@@ -1,5 +1,65 @@
 basePath: /v1
 definitions:
+  dto.AccountItem:
+    properties:
+      account_number:
+        type: integer
+      balance:
+        type: number
+      iban:
+        type: string
+      id:
+        type: string
+    type: object
+  dto.AddMoneyRequest:
+    properties:
+      amount:
+        type: number
+    type: object
+  dto.AddMoneyResponse:
+    properties:
+      balance:
+        type: number
+      customer_number:
+        type: integer
+    type: object
+  dto.CreateNewAccountRequest:
+    properties:
+      iso_country_code:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.GetProfileResponse:
+    properties:
+      account_list:
+        items:
+          $ref: '#/definitions/dto.AccountItem'
+        type: array
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      phone_number:
+        type: string
+    type: object
+  dto.GetTransferHistoryResponse:
+    properties:
+      amount:
+        type: number
+      from:
+        type: integer
+      id:
+        type: string
+      note:
+        type: string
+      to:
+        type: integer
+    type: object
   dto.LoginRequest:
     properties:
       password:
@@ -12,19 +72,45 @@ definitions:
       token:
         type: string
     type: object
-  dto.RegisterRequest:
+  dto.RegisterAccountRequest:
     properties:
-      confirm_password:
-        type: string
       email:
         type: string
       first_name:
         type: string
+      identity_number:
+        type: integer
+      iso_country_code:
+        type: string
       last_name:
         type: string
-      password:
+      phone_number:
+        type: integer
+    type: object
+  dto.TransferMoneyRequest:
+    properties:
+      amount:
+        type: number
+      from_account_number:
+        type: integer
+      note:
         type: string
-      username:
+      to_account_number:
+        type: integer
+    type: object
+  dto.UserInfoResponse:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        type: string
+      phone_number:
         type: string
     type: object
 info:
@@ -39,11 +125,152 @@ info:
   title: Teknasyon Case Study API
   version: "1.0"
 paths:
+  /account/add-money/{accountNumber}:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Add money to the account by providing the account number and the amount to be added.
+        You can imagine this as a deposit operation. Like depositing money using an ATM.
+      parameters:
+      - description: Bearer <token>
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Account Number
+        in: path
+        name: accountNumber
+        required: true
+        type: integer
+      - description: Add Money Request
+        in: body
+        name: addMoneyRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddMoneyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AddMoneyResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add money to the account
+      tags:
+      - Account
+  /account/create:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Create a new account for the registered user, the user must be registered before creating an account.
+        If you want to create an account for a user who has not registered yet, you should use the register endpoint.
+      parameters:
+      - description: Create Account Request
+        in: body
+        name: createAccountRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateNewAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new account for the registered user
+      tags:
+      - Account
+  /account/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        It should be used for users who will create an account for the first time, because when creating a user account, one user must also be created.
+        The user password will be sent via e-mail.
+      parameters:
+      - description: Register Request
+        in: body
+        name: registerRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Register a new account and user
+      tags:
+      - Account
+  /account/transfer:
+    post:
+      consumes:
+      - application/json
+      description: Transfer money between accounts by providing the account numbers
+        and the amount to be transferred.
+      parameters:
+      - description: Bearer <token>
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Transfer Money Request
+        in: body
+        name: transferMoneyRequest
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TransferMoneyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Transfer money between accounts
+      tags:
+      - Account
+  /account/transfer-approval:
+    get:
+      consumes:
+      - application/json
+      description: Approve the transfer by providing the transfer token.
+      parameters:
+      - description: Token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Approve the transfer
+      tags:
+      - Account
   /auth/login:
     post:
       consumes:
       - application/json
-      description: Login a user
+      description: |-
+        You can login with your identity number or customer number. If you are a new user, you can register with the /account/register endpoint.
+        If you registered before, your password will be sent to your e-mail address.
       parameters:
       - description: Login Request
         in: body
@@ -60,19 +287,35 @@ paths:
             $ref: '#/definitions/dto.LoginResponse'
       summary: Login a user
       tags:
-      - auth
-  /auth/register:
-    post:
+      - Auth
+  /auth/user-info:
+    get:
       consumes:
       - application/json
-      description: Register a new user
+      description: You can use this endpoint to get user information.
       parameters:
-      - description: Register Request
-        in: body
-        name: registerRequest
+      - description: Bearer <token>
+        in: header
+        name: Authorization
         required: true
-        schema:
-          $ref: '#/definitions/dto.RegisterRequest'
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UserInfoResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user info
+      tags:
+      - Auth
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Health Check for the API
       produces:
       - application/json
       responses:
@@ -81,7 +324,67 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Register a new user
+      summary: Health Check API
       tags:
-      - auth
+      - Health Check
+  /profile:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        This endpoint is used to get the user's profile information. It returns the user's account information and user information.
+        The user's account information includes the account number, balance, and account type.
+        The user information includes the user's name, surname, and e-mail address.
+        NOTE! The user's account information is returned as an array because the user can have more than one account.
+      parameters:
+      - description: Bearer <token>
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GetProfileResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile
+      tags:
+      - Profile
+  /profile/transfer-history:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        You can see only your own transfer history with this endpoint.
+        You can filter the transfer history by account number.
+        The account number is required for this endpoint.
+      parameters:
+      - description: Bearer <token>
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Account Number
+        in: query
+        name: accountNumber
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.GetTransferHistoryResponse'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Get user transfer history
+      tags:
+      - Profile
 swagger: "2.0"

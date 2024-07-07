@@ -16,9 +16,14 @@
     },
     "basePath": "/v1",
     "paths": {
-        "/auth/login": {
-            "post": {
-                "description": "Login a user",
+        "/account/add-money/{accountNumber}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add money to the account by providing the account number and the amount to be added.\nYou can imagine this as a deposit operation. Like depositing money using an ATM.",
                 "consumes": [
                     "application/json"
                 ],
@@ -26,7 +31,205 @@
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Account"
+                ],
+                "summary": "Add money to the account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer \u003ctoken\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Account Number",
+                        "name": "accountNumber",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Add Money Request",
+                        "name": "addMoneyRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AddMoneyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AddMoneyResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/account/create": {
+            "post": {
+                "description": "Create a new account for the registered user, the user must be registered before creating an account.\nIf you want to create an account for a user who has not registered yet, you should use the register endpoint.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Create a new account for the registered user",
+                "parameters": [
+                    {
+                        "description": "Create Account Request",
+                        "name": "createAccountRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateNewAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/account/register": {
+            "post": {
+                "description": "It should be used for users who will create an account for the first time, because when creating a user account, one user must also be created.\nThe user password will be sent via e-mail.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Register a new account and user",
+                "parameters": [
+                    {
+                        "description": "Register Request",
+                        "name": "registerRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RegisterAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/account/transfer": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Transfer money between accounts by providing the account numbers and the amount to be transferred.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Transfer money between accounts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer \u003ctoken\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Transfer Money Request",
+                        "name": "transferMoneyRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TransferMoneyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/account/transfer-approval": {
+            "get": {
+                "description": "Approve the transfer by providing the transfer token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Approve the transfer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "You can login with your identity number or customer number. If you are a new user, you can register with the /account/register endpoint.\nIf you registered before, your password will be sent to your e-mail address.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
                 ],
                 "summary": "Login a user",
                 "parameters": [
@@ -50,9 +253,14 @@
                 }
             }
         },
-        "/auth/register": {
-            "post": {
-                "description": "Register a new user",
+        "/auth/user-info": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "You can use this endpoint to get user information.",
                 "consumes": [
                     "application/json"
                 ],
@@ -60,20 +268,41 @@
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Auth"
                 ],
-                "summary": "Register a new user",
+                "summary": "Get user info",
                 "parameters": [
                     {
-                        "description": "Register Request",
-                        "name": "registerRequest",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.RegisterRequest"
-                        }
+                        "type": "string",
+                        "description": "Bearer \u003ctoken\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserInfoResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Health Check for the API",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health Check"
+                ],
+                "summary": "Health Check API",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -84,9 +313,186 @@
                     }
                 }
             }
+        },
+        "/profile": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "This endpoint is used to get the user's profile information. It returns the user's account information and user information.\nThe user's account information includes the account number, balance, and account type.\nThe user information includes the user's name, surname, and e-mail address.\nNOTE! The user's account information is returned as an array because the user can have more than one account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer \u003ctoken\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetProfileResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/transfer-history": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "You can see only your own transfer history with this endpoint.\nYou can filter the transfer history by account number.\nThe account number is required for this endpoint.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get user transfer history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer \u003ctoken\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account Number",
+                        "name": "accountNumber",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.GetTransferHistoryResponse"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "dto.AccountItem": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "integer"
+                },
+                "balance": {
+                    "type": "number"
+                },
+                "iban": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AddMoneyRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                }
+            }
+        },
+        "dto.AddMoneyResponse": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number"
+                },
+                "customer_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateNewAccountRequest": {
+            "type": "object",
+            "properties": {
+                "iso_country_code": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.GetProfileResponse": {
+            "type": "object",
+            "properties": {
+                "account_list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AccountItem"
+                    }
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.GetTransferHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "from": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.LoginRequest": {
             "type": "object",
             "properties": {
@@ -106,25 +512,65 @@
                 }
             }
         },
-        "dto.RegisterRequest": {
+        "dto.RegisterAccountRequest": {
             "type": "object",
             "properties": {
-                "confirm_password": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
                 "first_name": {
                     "type": "string"
                 },
+                "identity_number": {
+                    "type": "integer"
+                },
+                "iso_country_code": {
+                    "type": "string"
+                },
                 "last_name": {
                     "type": "string"
                 },
-                "password": {
+                "phone_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.TransferMoneyRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "from_account_number": {
+                    "type": "integer"
+                },
+                "note": {
                     "type": "string"
                 },
-                "username": {
+                "to_account_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UserInfoResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "phone_number": {
                     "type": "string"
                 }
             }

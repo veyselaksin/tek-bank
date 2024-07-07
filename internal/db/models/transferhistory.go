@@ -7,12 +7,12 @@ import (
 )
 
 type TransferHistory struct {
-	Id     string `gorm:"primary_key;type:uuid;"`
-	From   string `gorm:"type:uuid;not null"`
-	To     string `gorm:"type:uuid;not null"`
-	Status string `gorm:"default:'pending'"`
-	Note   string `gorm:"default:null"`
-	Amount float64
+	Id     string  `gorm:"primary_key;type:uuid;"`
+	From   int64   `gorm:"type:bigint;not null"`
+	To     int64   `gorm:"type:bigint;not null"`
+	Note   string  `gorm:"default:null"`
+	Amount float64 `gorm:"type:numeric;not null"`
+	IsFee  bool    `gorm:"default:false"`
 
 	// Audit fields
 	CreatedAt time.Time `gorm:"default:current_timestamp"`
@@ -22,8 +22,8 @@ type TransferHistory struct {
 	IsActive  bool      `gorm:"default:true"`
 
 	// Relationship
-	FromAccount Account `gorm:"foreignKey:From"`
-	ToAccount   Account `gorm:"foreignKey:To"`
+	FromAccount Account `gorm:"foreignKey:From;references:AccountNumber;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ToAccount   Account `gorm:"foreignKey:To;references:AccountNumber;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 func (t *TransferHistory) BeforeCreate(tx *gorm.DB) error {

@@ -8,9 +8,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"tek-bank/cmd/api"
 	"tek-bank/cmd/config"
@@ -19,8 +21,9 @@ import (
 	"tek-bank/internal/i18n"
 )
 
-var conn *gorm.DB
 var once sync.Once
+var conn *gorm.DB
+var redisConn *redis.Client
 
 var serverConf config.ServerConfig
 
@@ -36,6 +39,26 @@ func init() {
 			SSLMode:  os.Getenv("DB_SSL_MODE"),
 			Timezone: os.Getenv("DB_TIMEZONE"),
 		})
+
+		redisDB, err := strconv.Atoi(os.Getenv("REDIS_DB"))
+		if err != nil {
+			log.Error("Redis DB conversion error", err)
+		}
+
+		var redisPassword string
+		if os.Getenv("REDIS_PASSWORD") != "" {
+			redisPassword = os.Getenv("REDIS_PASSWORD")
+		}
+
+		// Initialize the Redis connection
+		redisConn = connection.RedisConnection(connection.RedisConfig{
+			Host:               os.Getenv("REDIS_HOST"),
+			Port:               os.Getenv("REDIS_PORT"),
+			Password:           redisPassword,
+			DB:                 redisDB,
+			TLSEnable:          os.Getenv("REDIS_TLS_ENABLE") == "true",
+			InsecureSkipVerify: os.Getenv("REDIS_INSECURE_SKIP_VERIFY") == "true",
+		})
 	})
 
 	// Initialize the config configuration
@@ -45,7 +68,7 @@ func init() {
 	}
 
 	//Swagger Info configuration
-	docs.SwaggerInfo.Host = fmt.Sprint(os.Getenv("APP_HOST"), ":", os.Getenv("APP_PORT"))
+	docs.SwaggerInfo.Host = fmt.Sprint(os.Getenv("SWAGGER_HOST"))
 
 	//Init i18n
 	i18n.InitBundle("./internal/i18n/languages/")
@@ -72,7 +95,7 @@ func main() {
 	}))
 
 	// Initialize routes
-	api.InitializeRouters(app, conn)
+	api.InitializeRouters(app, conn, redisConn)
 
 	// Start listening on port 8000
 	go func() {

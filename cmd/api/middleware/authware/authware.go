@@ -47,7 +47,7 @@ func setup(config Config) Config {
 			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, "Authorization header is missing")
 		}
 
-		saltToken, err := ExtractToken(c, reqToken, config.AuthorizationTypeBearer)
+		saltToken, err := ExtractToken(reqToken, config.AuthorizationTypeBearer)
 		if err != nil {
 			return cresponse.ErrorResponse(c, fiber.StatusUnauthorized, "Malformed token")
 		}
@@ -108,11 +108,12 @@ func New(config Config) fiber.Handler {
 }
 
 type CurrentUser struct {
-	Id        string `json:"id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Username  string `json:"username"`
+	Id          string `json:"id"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	PhoneNumber string `json:"phone_number"`
+	Email       string `json:"email"`
+	Username    string `json:"username"`
 }
 
 func checkPermission(ctx *fiber.Ctx, db *gorm.DB, claim JWTClaimsPayload) bool {

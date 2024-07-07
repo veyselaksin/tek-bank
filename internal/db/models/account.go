@@ -8,8 +8,9 @@ import (
 
 type Account struct {
 	Id            string `gorm:"primary_key;type:uuid;"`
-	AccountNumber string `gorm:"unique;not null"`
-	OwnerID       string `gorm:"type:uuid;not null"`
+	OwnerId       string `gorm:"type:uuid;not null"`
+	IBAN          string `gorm:"unique;not null"`
+	AccountNumber int64  `gorm:"unique;not null"`
 	Balance       float64
 
 	// Audit fields
@@ -20,7 +21,7 @@ type Account struct {
 	IsActive  bool      `gorm:"default:true"`
 
 	// Relationship
-	Owner User `gorm:"foreignKey:OwnerID"`
+	Owner User `gorm:"foreignKey:OwnerId;references:Id;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 func (a *Account) BeforeCreate(tx *gorm.DB) error {

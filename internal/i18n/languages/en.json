@@ -5,5 +5,11 @@
   "user_not_found": "User not found.",
   "passwords_do_not_match": "Passwords do not match.",
   "password_incorrect": "Password is incorrect.",
-    "invalid_login_credentials": "Invalid login credentials."
+  "invalid_login_credentials": "Invalid login credentials.",
+  "invalid_create_account_request": "Invalid create account request.",
+  "account_created": "Account created successfully, please check your e-mail for the password.",
+  "account_not_created": "Account not created.",
+  "insufficient_balance": "Insufficient balance.",
+  "transfer_approved": "Transfer approved.",
+  "unauthorized": "You are not authorized to perform this operation."
 }
