@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
@@ -19,6 +21,7 @@ import (
 	"tek-bank/docs"
 	"tek-bank/internal/db/connection"
 	"tek-bank/internal/i18n"
+	"time"
 )
 
 var once sync.Once
@@ -105,31 +108,52 @@ func main() {
 	}()
 
 	// Graceful shutdown
-	GracefulShutdown(app)
+	err := GracefulShutdown(app, 5*time.Second)
+	if err != nil {
+		log.Error("Graceful shutdown error", err)
+	}
 }
 
-func GracefulShutdown(app *fiber.App) {
-
-	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, os.Interrupt)
-	signal.Notify(sigChan, os.Kill)
+func GracefulShutdown(app *fiber.App, timeout time.Duration) error {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
 
 	sig := <-sigChan
-	log.Info("Received terminate,graceful shutdown", sig)
 
-	database, err := conn.DB()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	db, err := conn.DB()
 	if err != nil {
-		log.Error("Database Closing ERROR :", err)
+		return err
 	}
 
-	err = database.Close()
-	if err != nil {
-		return
+	if err := shutdownDatabase(ctx, db); err != nil {
+		return err
 	}
-	log.Info("Database Closed")
 
-	err = app.Shutdown()
-	if err != nil {
-		return
+	if err := app.Shutdown(); err != nil {
+		return err
+	}
+
+	log.Infof("Signal received: %v", sig)
+	return nil
+}
+
+func shutdownDatabase(ctx context.Context, db *sql.DB) error {
+	ch := make(chan error, 1)
+	go func() {
+		ch <- db.Close()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-ch:
+		if err != nil {
+			log.Error("Database close error", err)
+			return err
+		}
+		return nil
 	}
 }
