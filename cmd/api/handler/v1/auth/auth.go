@@ -44,12 +44,17 @@ func (h *authHandler) Login(ctx *fiber.Ctx) error {
 		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	response, status, err := h.authService.Login(ctx, request)
+	response, err := h.authService.Login(ctx.Context(), request)
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.UserNotFound || err.Error() == messages.PasswordIncorrect {
+			status = fiber.StatusUnauthorized
+		}
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }
 
 // GetUserInfo godoc
@@ -63,10 +68,15 @@ func (h *authHandler) Login(ctx *fiber.Ctx) error {
 // @Success 200 {object} dto.UserInfoResponse
 // @Router /auth/user-info [get]
 func (h *authHandler) GetUserInfo(ctx *fiber.Ctx) error {
-	response, status, err := h.authService.GetUserInfo(ctx)
+	response, err := h.authService.GetUserInfo(ctx.Context())
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.UserNotFound {
+			status = fiber.StatusNotFound
+		}
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }

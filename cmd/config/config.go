@@ -34,10 +34,6 @@ var FiberConfig = fiber.Config{
 	},
 }
 
-func GetLanguage(c *fiber.Ctx) string {
-	lang := c.Get("Accept-Language")
-	if lang == "" {
-		lang = "en"
-	}
-	return lang
+func GetLanguage(ctx *fiber.Ctx) string {
+	return ctx.Get("Accept-Language", "en")
 }

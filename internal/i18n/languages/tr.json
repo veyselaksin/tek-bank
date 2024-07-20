@@ -11,5 +11,7 @@
   "account_not_created": "Hesap oluşturulamadı.",
   "insufficient_balance": "Yetersiz bakiye.",
   "transfer_approved": "Transfer onaylandı.",
-  "unauthorized": "Bu işlemi yapmaya yetkiniz yok."
+  "unauthorized": "Bu işlemi yapmaya yetkiniz yok.",
+  "transaction_failed": "İşlem başarısız.",
+  "bad_request": "Geçersiz istek."
 }

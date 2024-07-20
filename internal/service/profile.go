@@ -1,20 +1,18 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/log"
 	"tek-bank/cmd/api/middleware/authware"
 	"tek-bank/internal/db/repository"
 	"tek-bank/internal/dto"
-	"tek-bank/internal/i18n"
 	"tek-bank/internal/i18n/messages"
 )
 
 type ProfileService interface {
-	MyProfile(ctx *fiber.Ctx) (*dto.GetProfileResponse, int, error)
-	MyTransferHistory(ctx *fiber.Ctx, accountNumber int64) ([]dto.GetTransferHistoryResponse, int, error)
+	MyProfile(ctx context.Context) (*dto.GetProfileResponse, error)
+	MyTransferHistory(ctx context.Context, accountNumber int64) ([]dto.GetTransferHistoryResponse, error)
 }
 
 type profileService struct {
@@ -35,22 +33,20 @@ func NewProfileService(
 	}
 }
 
-func (s *profileService) MyProfile(ctx *fiber.Ctx) (*dto.GetProfileResponse, int, error) {
+func (s *profileService) MyProfile(ctx context.Context) (*dto.GetProfileResponse, error) {
 	currentUser, err := authware.GetCurrentUser(ctx)
 	if err != nil {
-		log.Error(err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return nil, errors.New(messages.UnexpectedError)
 	}
 
 	accounts, err := s.accountRepository.FindByOwnerId(currentUser.Id)
 	if err != nil {
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return nil, errors.New(messages.AccountNotFound)
 	}
 
 	user, err := s.userRepository.FindByID(currentUser.Id)
 	if err != nil {
-		log.Error("Error finding a authware: ", err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return nil, errors.New(messages.UnexpectedError)
 	}
 
 	var accountItems []dto.AccountItem
@@ -72,27 +68,27 @@ func (s *profileService) MyProfile(ctx *fiber.Ctx) (*dto.GetProfileResponse, int
 		AccountList: accountItems,
 	}
 
-	return &response, fiber.StatusOK, nil
+	return &response, nil
 }
 
-func (s *profileService) MyTransferHistory(ctx *fiber.Ctx, accountNumber int64) ([]dto.GetTransferHistoryResponse, int, error) {
-	currentUser := ctx.Locals("user").(authware.CurrentUser)
+func (s *profileService) MyTransferHistory(ctx context.Context, accountNumber int64) ([]dto.GetTransferHistoryResponse, error) {
+	currentUser, err := authware.GetCurrentUser(ctx)
+	if err != nil {
+		return nil, errors.New(messages.Unauthorized)
+	}
 
 	account, err := s.accountRepository.FindByAccountNumber(accountNumber)
 	if err != nil {
-		log.Error(err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return nil, errors.New(messages.AccountNotFound)
 	}
 
 	if account.OwnerId != currentUser.Id {
-		log.Error("Unauthorized access.")
-		return nil, fiber.StatusUnauthorized, errors.New(i18n.CreateMsg(ctx, messages.Unauthorized))
+		return nil, errors.New(messages.Unauthorized)
 	}
 
 	transferHistory, err := s.transferRepository.FetchByAccountNumber(accountNumber)
 	if err != nil {
-		log.Error(err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return nil, errors.New(messages.AccountNotFound)
 	}
 
 	var response []dto.GetTransferHistoryResponse
@@ -114,5 +110,5 @@ func (s *profileService) MyTransferHistory(ctx *fiber.Ctx, accountNumber int64) 
 		})
 	}
 
-	return response, fiber.StatusOK, nil
+	return response, nil
 }

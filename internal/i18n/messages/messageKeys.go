@@ -13,4 +13,6 @@ var (
 	InSufficientBalance         = "insufficient_balance"
 	TransferApproved            = "transfer_approved"
 	Unauthorized                = "unauthorized"
+	BadRequest                  = "bad_request"
+	TransactionFailed           = "transaction_failed"
 )

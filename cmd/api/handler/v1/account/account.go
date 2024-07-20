@@ -44,22 +44,27 @@ func NewAccountHandler(accountService service.AccountService) AccountHandler {
 func (h *accountHandler) RegisterAccount(ctx *fiber.Ctx) error {
 	var request dto.RegisterAccountRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.BadRequest))
 	}
 
 	// Database transaction
 	tx, err := transaction.GetDbTx(ctx)
 	if err != nil {
 		log.Error(err)
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.TransactionFailed))
 	}
 
-	status, err := h.accountService.WithTx(tx).RegisterAccount(ctx, request)
+	err = h.accountService.WithTx(tx).RegisterAccount(ctx.Context(), request)
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.UserAlreadyExists {
+			status = fiber.StatusConflict
+		}
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, nil, i18n.CreateMsg(ctx, messages.AccountCreated))
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, nil, i18n.CreateMsg(ctx, messages.AccountCreated))
 }
 
 // CreateAccount godoc
@@ -80,12 +85,16 @@ func (h *accountHandler) CreateNewAccount(ctx *fiber.Ctx) error {
 		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
 	}
 
-	response, status, err := h.accountService.CreateNewAccount(ctx, request)
+	response, err := h.accountService.CreateNewAccount(ctx.Context(), request)
 	if err != nil {
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.UserNotFound {
+			status = fiber.StatusNotFound
+		}
 		return cresponse.ErrorResponse(ctx, status, err.Error())
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }
 
 // AddMoney godoc
@@ -104,12 +113,12 @@ func (h *accountHandler) CreateNewAccount(ctx *fiber.Ctx) error {
 func (h *accountHandler) AddMoney(ctx *fiber.Ctx) error {
 	accountNumber, err := strconv.Atoi(ctx.Params("accountNumber"))
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.BadRequest))
 	}
 
 	var request dto.AddMoneyRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.BadRequest))
 	}
 
 	request.AccountNumber = int64(accountNumber)
@@ -118,15 +127,21 @@ func (h *accountHandler) AddMoney(ctx *fiber.Ctx) error {
 	tx, err := transaction.GetDbTx(ctx)
 	if err != nil {
 		log.Error(err)
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.TransactionFailed))
 	}
 
-	response, status, err := h.accountService.WithTx(tx).AddMoney(ctx, request)
+	response, err := h.accountService.WithTx(tx).AddMoney(ctx.Context(), request)
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.AccountNotFound {
+			log.Error(err)
+			status = fiber.StatusNotFound
+		}
+
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }
 
 // TransferMoney godoc
@@ -143,22 +158,30 @@ func (h *accountHandler) AddMoney(ctx *fiber.Ctx) error {
 func (h *accountHandler) TransferMoney(ctx *fiber.Ctx) error {
 	var request dto.TransferMoneyRequest
 	if err := ctx.BodyParser(&request); err != nil {
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, messages.BadRequest)
 	}
 
 	// Database transaction
 	tx, err := transaction.GetDbTx(ctx)
 	if err != nil {
 		log.Error(err)
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, messages.TransactionFailed)
 	}
 
-	status, err := h.accountService.WithTx(tx).TransferMoney(ctx, request)
+	err = h.accountService.WithTx(tx).TransferMoney(ctx.Context(), request)
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.AccountNotFound {
+			status = fiber.StatusNotFound
+		} else if err.Error() == messages.InSufficientBalance {
+			status = fiber.StatusBadRequest
+		}
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, nil)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, nil)
 }
 
 // TransferApproval godoc
@@ -177,13 +200,20 @@ func (h *accountHandler) TransferApproval(ctx *fiber.Ctx) error {
 	tx, err := transaction.GetDbTx(ctx)
 	if err != nil {
 		log.Error(err)
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.TransactionFailed))
 	}
 
-	status, err := h.accountService.WithTx(tx).TransferApproval(ctx, token)
+	err = h.accountService.WithTx(tx).TransferApproval(ctx.Context(), token)
 	if err != nil {
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.AccountNotFound {
+			status = fiber.StatusNotFound
+		} else if err.Error() == messages.InSufficientBalance {
+			status = fiber.StatusBadRequest
+		}
+		log.Error(err.Error())
 		return cresponse.ErrorResponse(ctx, status, err.Error())
 	}
 
-	return cresponse.SuccessResponse(ctx, status, nil, i18n.CreateMsg(ctx, messages.TransferApproved))
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, nil, i18n.CreateMsg(ctx, messages.TransferApproved))
 }

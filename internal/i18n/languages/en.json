@@ -11,5 +11,7 @@
   "account_not_created": "Account not created.",
   "insufficient_balance": "Insufficient balance.",
   "transfer_approved": "Transfer approved.",
-  "unauthorized": "You are not authorized to perform this operation."
+  "unauthorized": "You are not authorized to perform this operation.",
+  "transaction_failed": "Transaction failed.",
+  "bad_request": "Bad request."
 }

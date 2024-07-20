@@ -4,26 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/log"
 	"gorm.io/gorm"
 	"tek-bank/internal/db/models"
 	"tek-bank/internal/db/repository"
 	"tek-bank/internal/dto"
-	"tek-bank/internal/i18n"
 	"tek-bank/internal/i18n/messages"
 	"tek-bank/pkg/converter"
 	"tek-bank/pkg/crypto"
 	"tek-bank/pkg/enum"
 	"tek-bank/pkg/gomailer"
+	"time"
 )
 
 type AccountService interface {
-	RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAccountRequest) (int, error)
-	CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewAccountRequest) (*dto.CreateNewAccountResponse, int, error)
-	AddMoney(ctx *fiber.Ctx, request dto.AddMoneyRequest) (*dto.AddMoneyResponse, int, error)
-	TransferMoney(ctx *fiber.Ctx, request dto.TransferMoneyRequest) (int, error)
-	TransferApproval(ctx *fiber.Ctx, token string) (int, error)
+	RegisterAccount(ctx context.Context, request dto.RegisterAccountRequest) error
+	CreateNewAccount(ctx context.Context, request dto.CreateNewAccountRequest) (*dto.CreateNewAccountResponse, error)
+	AddMoney(ctx context.Context, request dto.AddMoneyRequest) (*dto.AddMoneyResponse, error)
+	TransferMoney(ctx context.Context, request dto.TransferMoneyRequest) error
+	TransferApproval(ctx context.Context, token string) error
 
 	WithTx(trxHandle *gorm.DB) AccountService
 }
@@ -59,18 +57,16 @@ func (s *accountService) WithTx(trxHandle *gorm.DB) AccountService {
 
 }
 
-func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAccountRequest) (int, error) {
+func (s *accountService) RegisterAccount(ctx context.Context, request dto.RegisterAccountRequest) error {
 
 	// Check if the authware already exists
 	_, err := s.userRepository.FindByEmail(request.Email)
 	if err == nil {
-		log.Error("User already exists.")
-		return fiber.StatusConflict, errors.New(i18n.CreateMsg(ctx, messages.UserAlreadyExists))
+		return errors.New(messages.UserAlreadyExists)
 	}
 
 	if err.Error() != "record not found" {
-		log.Error("Error finding a authware: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	randomPassword := s.pkgCrypto.RandomPassword()
@@ -78,8 +74,7 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 	// Hash the password
 	hashedPassword, err := s.pkgCrypto.HashPassword(randomPassword)
 	if err != nil {
-		log.Error("Error hashing the password: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Register a new authware
@@ -95,8 +90,7 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 
 	createdUser, err := s.userRepository.Create(user)
 	if err != nil {
-		log.Error("Error creating a new authware: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Create a new account for the user
@@ -111,9 +105,10 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 
 	_, err = s.accountRepository.Create(account)
 	if err != nil {
-		log.Error("Error creating a new account: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
+
+	errCh := make(chan error)
 
 	go func() {
 		// Send the password to the user's email
@@ -125,25 +120,36 @@ func (s *accountService) RegisterAccount(ctx *fiber.Ctx, request dto.RegisterAcc
 
 		err = gomailer.SendMail(content)
 		if err != nil {
-			log.Error("Error sending the email: ", err)
+			errCh <- err
 		}
 	}()
 
-	return fiber.StatusCreated, nil
+	// Use a select statement to wait for an error or a timeout
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return errors.New(messages.UnexpectedError)
+		}
+	case <-time.After(2 * time.Second):
+		break
+	}
+
+	// Close the error channel
+	close(errCh)
+
+	return nil
 }
 
 // CreateNewAccount creates a new account for the registered user
-func (s *accountService) CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewAccountRequest) (*dto.CreateNewAccountResponse, int, error) {
+func (s *accountService) CreateNewAccount(ctx context.Context, request dto.CreateNewAccountRequest) (*dto.CreateNewAccountResponse, error) {
 	// Check if the user exists
 	_, err := s.userRepository.FindByID(request.UserId)
 	if err != nil && err.Error() == "record not found" {
-		log.Error("Error finding the user: ", err)
-		return nil, fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.UserNotFound))
+		return nil, errors.New(messages.UserNotFound)
 	}
 
 	if err != nil {
-		log.Error("Error finding a authware: ", err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return nil, errors.New(messages.UnexpectedError)
 	}
 
 	// Create a random IBAN for the user
@@ -161,8 +167,7 @@ func (s *accountService) CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewA
 
 	createdAccount, err := s.accountRepository.Create(account)
 	if err != nil {
-		log.Error("Error creating a new account: ", err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return nil, errors.New(messages.UnexpectedError)
 	}
 
 	response := &dto.CreateNewAccountResponse{
@@ -175,28 +180,25 @@ func (s *accountService) CreateNewAccount(ctx *fiber.Ctx, request dto.CreateNewA
 		IsActive:      createdAccount.IsActive,
 	}
 
-	return response, fiber.StatusCreated, nil
+	return response, nil
 }
 
-func (s *accountService) AddMoney(ctx *fiber.Ctx, request dto.AddMoneyRequest) (*dto.AddMoneyResponse, int, error) {
+func (s *accountService) AddMoney(ctx context.Context, request dto.AddMoneyRequest) (*dto.AddMoneyResponse, error) {
 	// Check if the account exists
 	account, err := s.accountRepository.FindByAccountNumber(request.AccountNumber)
 	if err != nil {
-		log.Error("Error finding the account: ", err)
-		return nil, fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return nil, errors.New(messages.AccountNotFound)
 	}
 
 	// Add money to the account
 	err = s.accountRepository.UpdateBalance(account.Balance+request.Amount, account.Id)
 	if err != nil {
-		log.Error("Error updating the account: ", err)
-		return nil, fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return nil, errors.New(messages.UnexpectedError)
 	}
 
 	updatedAccount, err := s.accountRepository.FindByAccountNumber(request.AccountNumber)
 	if err != nil {
-		log.Error("Error finding the account: ", err)
-		return nil, fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return nil, errors.New(messages.AccountNotFound)
 	}
 
 	response := &dto.AddMoneyResponse{
@@ -204,28 +206,26 @@ func (s *accountService) AddMoney(ctx *fiber.Ctx, request dto.AddMoneyRequest) (
 		Balance:        updatedAccount.Balance,
 	}
 
-	return response, fiber.StatusOK, nil
+	return response, nil
 }
 
-func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoneyRequest) (int, error) {
+func (s *accountService) TransferMoney(ctx context.Context, request dto.TransferMoneyRequest) error {
 	// Check if the sender account exists
 	senderAccount, err := s.accountRepository.FindByAccountNumber(request.FromAccountNumber)
 	if err != nil {
-		log.Error("Error finding the sender account: ", err)
-		return fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return errors.New(messages.AccountNotFound)
 	}
 
 	// Check if the sender account has enough balance
 	totalAmount := request.Amount + enum.TransferFee
 	if senderAccount.Balance < totalAmount {
-		return fiber.StatusUnprocessableEntity, errors.New(i18n.CreateMsg(ctx, messages.InSufficientBalance))
+		return errors.New(messages.InSufficientBalance)
 	}
 
 	// Create a token for the transaction approval
 	token, err := s.pkgCrypto.GenerateToken(32)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Save token to Redis
@@ -247,18 +247,16 @@ func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoney
 
 	content, err := s.pkgConverter.Stos(value)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// One hour expiration time
 	err = s.accountRepository.SetToken(context.Background(), token, *content)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
-	transferApprovalLink := fmt.Sprintf("%s://%s/v1/account/transfer-approval?token=%s", ctx.Protocol(), ctx.Hostname(), token)
+	transferApprovalLink := fmt.Sprintf("http://localhost/v1/account/transfer-approval?token=%s", token)
 	var body string = `
 			<body>
 				<p>Your Account Number: <strong>` + fmt.Sprint(request.FromAccountNumber) + `</strong></p>
@@ -273,6 +271,8 @@ func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoney
 			</body>
 	`
 
+	errCh := make(chan error)
+
 	go func() {
 		// Send the password to the user's email
 		content := gomailer.Content{
@@ -283,20 +283,32 @@ func (s *accountService) TransferMoney(ctx *fiber.Ctx, request dto.TransferMoney
 
 		err = gomailer.SendMail(content)
 		if err != nil {
-			log.Error("Error sending the email: ", err)
+			errCh <- err
 		}
 	}()
 
-	return fiber.StatusOK, nil
+	// Use a select statement to wait for an error or a timeout
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return errors.New(messages.UnexpectedError)
+		}
+	case <-time.After(2 * time.Second):
+		break
+	}
+
+	// Close the error channel
+	close(errCh)
+
+	return nil
 }
 
 // TransferApproval approves the transaction
-func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, error) {
+func (s *accountService) TransferApproval(ctx context.Context, token string) error {
 	// Get the token from Redis
 	value, err := s.accountRepository.GetToken(context.Background(), token)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	var content struct {
@@ -310,42 +322,37 @@ func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, er
 
 	err = s.pkgConverter.Stom(*value, &content)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Check if the sender account exists
 	senderAccount, err := s.accountRepository.FindByAccountNumber(content.FromAccountNumber)
 	if err != nil {
-		log.Error("Error finding the sender account: ", err)
-		return fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return errors.New(messages.AccountNotFound)
 	}
 
 	// Check if the receiver account exists
 	receiverAccount, err := s.accountRepository.FindByAccountNumber(content.ToAccountNumber)
 	if err != nil {
-		log.Error("Error finding the receiver account: ", err)
-		return fiber.StatusNotFound, errors.New(i18n.CreateMsg(ctx, messages.AccountNotFound))
+		return errors.New(messages.AccountNotFound)
 	}
 
 	// Check if the sender account has enough balance
 	totalAmount := content.Amount + content.TransactionFee
 	if senderAccount.Balance < totalAmount {
-		return fiber.StatusUnprocessableEntity, errors.New(i18n.CreateMsg(ctx, messages.InSufficientBalance))
+		return errors.New(messages.InSufficientBalance)
 	}
 
 	// Deduct the amount from the sender account
 	err = s.accountRepository.UpdateBalance(senderAccount.Balance-totalAmount, senderAccount.Id)
 	if err != nil {
-		log.Error("Error updating the sender account: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Add the amount to the receiver account
 	err = s.accountRepository.UpdateBalance(receiverAccount.Balance+content.Amount, receiverAccount.Id)
 	if err != nil {
-		log.Error("Error updating the receiver account: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Multiple insertions to transfer history table
@@ -371,16 +378,16 @@ func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, er
 
 	err = s.transferHistoryRepository.Create(transferHistories)
 	if err != nil {
-		log.Error("Error creating a new transfer history: ", err)
-		return fiber.StatusInternalServerError, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
 
 	// Delete the token from Redis
 	err = s.accountRepository.DeleteToken(context.Background(), token)
 	if err != nil {
-		log.Error(err)
-		return fiber.StatusBadGateway, errors.New(i18n.CreateMsg(ctx, messages.UnexpectedError))
+		return errors.New(messages.UnexpectedError)
 	}
+
+	errCh := make(chan error)
 
 	// Send an email to the sender and receiver
 	go func() {
@@ -393,7 +400,7 @@ func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, er
 
 		err = gomailer.SendMail(contentSender)
 		if err != nil {
-			log.Error("Error sending the email: ", err)
+			errCh <- err
 		}
 
 		contentReceiver := gomailer.Content{
@@ -404,9 +411,22 @@ func (s *accountService) TransferApproval(ctx *fiber.Ctx, token string) (int, er
 
 		err = gomailer.SendMail(contentReceiver)
 		if err != nil {
-			log.Error("Error sending the email: ", err)
+			errCh <- err
 		}
 	}()
 
-	return fiber.StatusOK, nil
+	// Use a select statement to wait for an error or a timeout
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return errors.New(messages.UnexpectedError)
+		}
+	case <-time.After(2 * time.Second):
+		break
+	}
+
+	// Close the error channel
+	close(errCh)
+
+	return nil
 }

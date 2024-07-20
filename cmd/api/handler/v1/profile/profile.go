@@ -4,6 +4,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"strconv"
+	"tek-bank/internal/i18n"
+	"tek-bank/internal/i18n/messages"
 	"tek-bank/internal/service"
 	"tek-bank/pkg/cresponse"
 )
@@ -37,12 +39,17 @@ func NewProfileHandler(profileService service.ProfileService) ProfileHandler {
 // @Success 200 {object} dto.GetProfileResponse
 // @Router /profile [get]
 func (h *profileHandler) MyProfile(ctx *fiber.Ctx) error {
-	response, status, err := h.profileService.MyProfile(ctx)
+	response, err := h.profileService.MyProfile(ctx.Context())
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.AccountNotFound {
+			status = fiber.StatusNotFound
+		}
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }
 
 // MyTransferHistory godoc
@@ -62,14 +69,18 @@ func (h *profileHandler) MyTransferHistory(ctx *fiber.Ctx) error {
 
 	accountNumber, err := strconv.Atoi(ctx.Query("accountNumber"))
 	if err != nil {
-		log.Error(err)
-		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, err.Error())
+		log.Error(err.Error())
+		return cresponse.ErrorResponse(ctx, fiber.StatusBadRequest, i18n.CreateMsg(ctx, messages.BadRequest))
 	}
 
-	response, status, err := h.profileService.MyTransferHistory(ctx, int64(accountNumber))
+	response, err := h.profileService.MyTransferHistory(ctx.Context(), int64(accountNumber))
 	if err != nil {
-		return cresponse.ErrorResponse(ctx, status, err.Error())
+		var status int = fiber.StatusInternalServerError
+		if err.Error() == messages.AccountNotFound {
+			status = fiber.StatusNotFound
+		}
+		return cresponse.ErrorResponse(ctx, status, i18n.CreateMsg(ctx, err.Error()))
 	}
 
-	return cresponse.SuccessResponse(ctx, status, response)
+	return cresponse.SuccessResponse(ctx, fiber.StatusOK, response)
 }

@@ -1,6 +1,7 @@
 package authware
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -150,9 +151,9 @@ func checkPermission(ctx *fiber.Ctx, db *gorm.DB, claim JWTClaimsPayload) bool {
 	}
 }
 
-func GetCurrentUser(ctx *fiber.Ctx) (CurrentUser, error) {
+func GetCurrentUser(ctx context.Context) (CurrentUser, error) {
 	var response CurrentUser
-	currentUser := ctx.Locals(currentUserLabel)
+	currentUser := ctx.Value(currentUserLabel)
 
 	if currentUser == nil {
 		return response, errors.New("User not found")
