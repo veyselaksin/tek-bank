@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"sync"
 	"tek-bank/internal/db/models"
 	"time"
 )
@@ -28,6 +29,7 @@ type userRepository struct {
 	db          *gorm.DB
 	redisClient *redis.Client
 	tableName   string
+	dbMutex     sync.Mutex
 }
 
 func NewUserRepository(db *gorm.DB) UserRepository {
@@ -96,6 +98,9 @@ func (r *userRepository) Create(user models.User) (*models.User, error) {
 }
 
 func (r *userRepository) SoftDelete(id string) error {
+	r.dbMutex.Lock()
+	defer r.dbMutex.Unlock()
+
 	result := r.db.Table(r.tableName).Where("id = ?", id).Update("is_active", false)
 	if result.Error != nil {
 		return result.Error

@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"sync"
 	"tek-bank/internal/db/models"
 )
 
@@ -28,6 +29,7 @@ type accountRepository struct {
 	db          *gorm.DB
 	redisClient *redis.Client
 	tableName   string
+	dbMutex     sync.Mutex
 }
 
 func NewAccountRepository(db *gorm.DB, client *redis.Client) AccountRepository {
@@ -57,6 +59,9 @@ func (r *accountRepository) Create(account models.Account) (*models.Account, err
 }
 
 func (r *accountRepository) UpdateBalance(amount float64, id string) error {
+	r.dbMutex.Lock()
+	defer r.dbMutex.Unlock()
+
 	// Add money to the account
 	result := r.db.Table(r.tableName).Preload("Owner").Where("id = ?", id).Update("balance", amount)
 	if result.Error != nil {
